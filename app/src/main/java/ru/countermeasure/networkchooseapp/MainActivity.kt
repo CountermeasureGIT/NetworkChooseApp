@@ -22,8 +22,10 @@ class MainActivity : AppCompatActivity() {
     private val connectivityManager by lazy {
         applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     }
-    private val okHttpClient = OkHttpClient()
+    private var okHttpClient = OkHttpClient()
     private val request = Request.Builder().url("https://api.ipify.org").build()
+
+    private var flag = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +66,7 @@ class MainActivity : AppCompatActivity() {
                             connectivityManager.bindProcessToNetwork(network)
                         }
                         if (result) {
+                            flag = true
                             log("Bound to MOBILE: $result, network: $network")
                             setCurrentNetworkText("MOBILE $network")
                             return@setOnClickListener
@@ -95,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                             connectivityManager.bindProcessToNetwork(network)
                         }
                         if (result) {
+                            flag = true
                             log("Bound to WIFI: $result, network: $network")
                             setCurrentNetworkText("WIFI $network")
                             return@setOnClickListener
@@ -106,6 +110,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         btn_getIp.setOnClickListener {
+            if (flag) {
+                okHttpClient = OkHttpClient()
+                flag = false
+            }
             log("Getting IP")
             okHttpClient.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
