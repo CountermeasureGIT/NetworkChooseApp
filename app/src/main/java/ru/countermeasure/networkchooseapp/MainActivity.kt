@@ -1,15 +1,13 @@
 package ru.countermeasure.networkchooseapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
-import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
-import android.telephony.TelephonyManager
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -23,9 +21,6 @@ class MainActivity : AppCompatActivity() {
 
     private val connectivityManager by lazy {
         applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    }
-    private val telephonyManager by lazy {
-        applicationContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
     }
     private val okHttpClient = OkHttpClient()
     private val request = Request.Builder().url("https://api.ipify.org").build()
@@ -51,59 +46,63 @@ class MainActivity : AppCompatActivity() {
         btn_mobile.setOnClickListener {
             log("FETCHING MOBILE AVAILABILITY")
 
-            val networkRequest = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
+            val networks = connectivityManager.allNetworks
+            var capabilities: NetworkCapabilities?
 
-            connectivityManager.requestNetwork(
-                networkRequest,
-                object : ConnectivityManager.NetworkCallback() {
-                    override fun onUnavailable() {
-                        log("MOBILE UNAVAILABLE")
-                    }
-
-                    override fun onAvailable(network: Network) {
-                        log("MOBILE Available")
+            for (network in networks) {
+                capabilities = connectivityManager.getNetworkCapabilities(network)
+                capabilities?.let {
+                    if (it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        it.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+                    ) {
+                        log("MOBILE Available $network")
                         val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                            ConnectivityManager.setProcessDefaultNetwork(null)
                             ConnectivityManager.setProcessDefaultNetwork(network)
                         } else {
+                            connectivityManager.bindProcessToNetwork(null)
                             connectivityManager.bindProcessToNetwork(network)
                         }
-                        log("Bound to MOBILE: $result, network: $network")
-                        if (result) setCurrentNetwork("MOBILE $network")
+                        if (result) {
+                            log("Bound to MOBILE: $result, network: $network")
+                            setCurrentNetworkText("MOBILE $network")
+                            return@setOnClickListener
+                        }
                     }
                 }
-            )
+            }
+            log("DID NOT BOUND TO MOBILE NETWORK")
         }
 
         btn_wifi.setOnClickListener {
             log("FETCHING WIFI")
 
-            val networkRequest = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
+            val networks = connectivityManager.allNetworks
+            var capabilities: NetworkCapabilities?
 
-            connectivityManager.requestNetwork(
-                networkRequest,
-                object : ConnectivityManager.NetworkCallback() {
-                    override fun onUnavailable() {
-                        log("WIFI unavailable")
-                    }
-
-                    override fun onAvailable(network: Network) {
-                        log("WIFI Available")
+            for (network in networks) {
+                capabilities = connectivityManager.getNetworkCapabilities(network)
+                capabilities?.let {
+                    if (it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    ) {
+                        log("WIFI Available $network")
                         val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                            ConnectivityManager.setProcessDefaultNetwork(null)
                             ConnectivityManager.setProcessDefaultNetwork(network)
                         } else {
+                            connectivityManager.bindProcessToNetwork(null)
                             connectivityManager.bindProcessToNetwork(network)
                         }
-                        log("Bound to WIFI: $result, network: $network")
-                        if (result) setCurrentNetwork("WIFI $network")
+                        if (result) {
+                            log("Bound to WIFI: $result, network: $network")
+                            setCurrentNetworkText("WIFI $network")
+                            return@setOnClickListener
+                        }
                     }
                 }
-            )
+            }
+            log("DID NOT BOUND TO WIFI NETWORK")
         }
 
         btn_getIp.setOnClickListener {
@@ -111,25 +110,26 @@ class MainActivity : AppCompatActivity() {
             okHttpClient.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     log("IP GET Error")
-                    setIp("Error")
+                    setIpText("Error")
                 }
 
                 override fun onResponse(call: Call, response: Response) {
                     val body = response.body?.string()
-                    log("IP GET Success")
-                    setIp(body.toString())
+                    log("IP GET Success: $body")
+                    setIpText(body.toString())
                     response.close()
                 }
             })
         }
     }
 
-    private fun setCurrentNetwork(str: String) {
+    private fun setCurrentNetworkText(str: String) {
         runOnUiThread {
             tv_currentNetwork.text = str
         }
     }
 
+    @SuppressLint("SetTextI18n")
     private fun log(str: String) {
         runOnUiThread {
             tv_log.text = "${tv_log.text}\n${Date().format("hh:mm:ss")} $str"
@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setIp(str: String) {
+    private fun setIpText(str: String) {
         runOnUiThread {
             tv_ip.text = str
         }
