@@ -5,12 +5,15 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_main.*
 import okhttp3.*
@@ -25,13 +28,37 @@ class MainActivity : AppCompatActivity() {
     private var okHttpClient = OkHttpClient()
     private val request = Request.Builder().url("https://api.ipify.org").build()
 
-    private var flag = false
+    private val networkCallback by lazy {
+        object : ConnectivityManager.NetworkCallback() {
 
+            override fun onLost(network: Network) {
+//                log("callback: onLost ${getCurrentNetworkCapabilities()}")
+            }
+
+            override fun onAvailable(network: Network) {
+//                val capabilities = connectivityManager.getNetworkCapabilities(network)
+//                val string = buildString {
+//                    appendln("wifi: ${capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true}")
+//                    appendln("mobile: ${capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true}")
+//                    append("vpn: ${capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true}")
+//                }
+//                log("callback: available $string")
+            }
+        }
+    }
+
+    private val service by lazy {
+        NotificationManagerCompat.from(this)// getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
+
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val permissions = arrayOf(
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_NETWORK_STATE,
             Manifest.permission.CHANGE_NETWORK_STATE
         )
@@ -45,75 +72,11 @@ class MainActivity : AppCompatActivity() {
                 ActivityCompat.requestPermissions(this, permissions, 100)
             }
 
-        btn_mobile.setOnClickListener {
-            log("FETCHING MOBILE AVAILABILITY")
-
-            val networks = connectivityManager.allNetworks
-            var capabilities: NetworkCapabilities?
-
-            for (network in networks) {
-                capabilities = connectivityManager.getNetworkCapabilities(network)
-                capabilities?.let {
-                    if (it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        it.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                    ) {
-                        log("MOBILE Available $network")
-                        val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                            ConnectivityManager.setProcessDefaultNetwork(null)
-                            ConnectivityManager.setProcessDefaultNetwork(network)
-                        } else {
-                            connectivityManager.bindProcessToNetwork(null)
-                            connectivityManager.bindProcessToNetwork(network)
-                        }
-                        if (result) {
-                            flag = true
-                            log("Bound to MOBILE: $result, network: $network")
-                            setCurrentNetworkText("MOBILE $network")
-                            return@setOnClickListener
-                        }
-                    }
-                }
-            }
-            log("DID NOT BOUND TO MOBILE NETWORK")
-        }
-
-        btn_wifi.setOnClickListener {
-            log("FETCHING WIFI")
-
-            val networks = connectivityManager.allNetworks
-            var capabilities: NetworkCapabilities?
-
-            for (network in networks) {
-                capabilities = connectivityManager.getNetworkCapabilities(network)
-                capabilities?.let {
-                    if (it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                    ) {
-                        log("WIFI Available $network")
-                        val result = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                            ConnectivityManager.setProcessDefaultNetwork(null)
-                            ConnectivityManager.setProcessDefaultNetwork(network)
-                        } else {
-                            connectivityManager.bindProcessToNetwork(null)
-                            connectivityManager.bindProcessToNetwork(network)
-                        }
-                        if (result) {
-                            flag = true
-                            log("Bound to WIFI: $result, network: $network")
-                            setCurrentNetworkText("WIFI $network")
-                            return@setOnClickListener
-                        }
-                    }
-                }
-            }
-            log("DID NOT BOUND TO WIFI NETWORK")
+        btn_network_capabilities.setOnClickListener {
+            log(getCurrentNetworkCapabilities())
         }
 
         btn_getIp.setOnClickListener {
-            if (flag) {
-                okHttpClient = OkHttpClient()
-                flag = false
-            }
             log("Getting IP")
             okHttpClient.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -129,6 +92,69 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
+
+        log(getCurrentNetworkCapabilities())
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connectivityManager.registerDefaultNetworkCallback(
+                networkCallback
+            )
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun getCurrentNetworkCapabilities(): String {
+        val list = mutableListOf<NetworkType>()
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            val allNetworks = connectivityManager.allNetworks
+            var networkInfo: NetworkInfo?
+
+            for (network: Network in allNetworks) {
+                networkInfo = connectivityManager.getNetworkInfo(network)
+                if (networkInfo != null && networkInfo.isConnected) {
+                    when (networkInfo.type) {
+                        ConnectivityManager.TYPE_WIFI ->
+                            list.add(NetworkType.WIFI)
+                        ConnectivityManager.TYPE_MOBILE ->
+                            list.add(NetworkType.MOBILE)
+                        ConnectivityManager.TYPE_VPN ->
+                            list.add(NetworkType.WIFI_VPN)
+                    }
+                }
+            }
+            if (list.isEmpty())
+                list.add(NetworkType.NOTHING)
+        } else {
+            val allNetworks = connectivityManager.allNetworks
+            var networkCapabilities: NetworkCapabilities
+            var networkType: NetworkType?
+
+            for (network: Network in allNetworks) {
+                networkType = null
+                networkCapabilities =
+                    connectivityManager.getNetworkCapabilities(network) ?: continue
+
+                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
+                    networkType =
+                        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
+                            NetworkType.WIFI_VPN
+                        else NetworkType.WIFI
+
+                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR))
+                    networkType =
+                        if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN))
+                            NetworkType.MOBILE_VPN
+                        else NetworkType.MOBILE
+
+                networkType?.let { list.add(it) }
+            }
+        }
+
+        if (list.isEmpty())
+            list.add(NetworkType.NOTHING)
+
+        return list.joinToString(separator = ", ") { it.name }
     }
 
     private fun setCurrentNetworkText(str: String) {
@@ -140,7 +166,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun log(str: String) {
         runOnUiThread {
-            tv_log.text = "${tv_log.text}\n${Date().format("hh:mm:ss")} $str"
+            tv_log.text = "${tv_log.text}\n${Date().format("hh:mm:ss")}\n$str"
             scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
         }
     }
@@ -150,4 +176,12 @@ class MainActivity : AppCompatActivity() {
             tv_ip.text = str
         }
     }
+}
+
+enum class NetworkType {
+    WIFI,
+    MOBILE,
+    WIFI_VPN,
+    MOBILE_VPN,
+    NOTHING
 }

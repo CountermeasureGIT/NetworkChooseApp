@@ -7,14 +7,13 @@
     tools:context=".MainActivity">
 
     <Button
-        android:id="@+id/btn_mobile"
+        android:id="@+id/btn_network_capabilities"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="MOBILE"
-        app:layout_constraintEnd_toStartOf="@+id/btn_wifi"
+        android:layout_marginTop="8dp"
+        android:text="Get capabiilities"
+        app:layout_constraintEnd_toStartOf="@+id/btn_getIp"
         app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintHorizontal_chainStyle="spread"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/tv_currentNetwork" />
 
@@ -22,42 +21,29 @@
         android:id="@+id/tv_currentNetwork"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:text="No Text"
         android:textSize="16sp"
-        app:layout_constraintEnd_toEndOf="@+id/btn_wifi"
-        app:layout_constraintStart_toStartOf="@+id/btn_wifi"
-        app:layout_constraintTop_toBottomOf="@+id/tv_ip" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_editor_absoluteY="51dp" />
 
     <Button
         android:id="@+id/btn_getIp"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Get Ip"
-        app:layout_constraintBottom_toBottomOf="@+id/btn_wifi"
+        app:layout_constraintBaseline_toBaselineOf="@+id/btn_network_capabilities"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toEndOf="@+id/btn_wifi"
-        app:layout_constraintTop_toTopOf="@+id/btn_wifi" />
-
-    <Button
-        android:id="@+id/btn_wifi"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="WiFI"
-        app:layout_constraintBottom_toBottomOf="@+id/btn_mobile"
-        app:layout_constraintEnd_toStartOf="@+id/btn_getIp"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toEndOf="@+id/btn_mobile"
-        app:layout_constraintTop_toTopOf="@+id/btn_mobile" />
+        app:layout_constraintStart_toEndOf="@+id/btn_network_capabilities" />
 
     <TextView
         android:id="@+id/tv_ip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
         android:text="No ip data"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -71,7 +57,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/btn_mobile">
+        app:layout_constraintTop_toBottomOf="@+id/btn_network_capabilities">
 
         <TextView
             android:id="@+id/tv_log"
